@@ -12,48 +12,46 @@ DB_CONFIG = {
 
 def stream_users_in_batches(batch_size=50):
     """
-    Generator to fetch rows from the user_data table in batches of size 50 by default.
-    
-    :param batch_size: Number of records to fetch per batch (default: 50)
-    :yield: List of user records (dictionaries)
+    Generator to fetch users from the database in batches of specified size.
+    :param batch_size: Number of rows per batch (default: 50)
+    :yield: List of user records per batch
     """
     connection = None
     try:
         connection = psycopg2.connect(**DB_CONFIG)
-        cursor = connection.cursor(cursor_factory=RealDictCursor)
-        offset = 0
+        with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("SELECT COUNT(*) FROM user_data;")
+            total_rows = cursor.fetchone()["count"]
+            offset = 0
 
-        while True:
-            # Fetch batch of users (default: 50)
-            cursor.execute(
-                "SELECT * FROM user_data ORDER BY user_id LIMIT %s OFFSET %s;",
-                (batch_size, offset)
-            )
-            batch = cursor.fetchall()
-            if not batch:
-                break
-            yield batch
-            offset += batch_size
+            # Loop through the table in batches
+            while offset < total_rows:
+                cursor.execute(
+                    "SELECT * FROM user_data ORDER BY user_id LIMIT %s OFFSET %s;",
+                    (batch_size, offset)
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    break
+                yield rows  # Yield each batch instead of returning all
+                offset += batch_size
     finally:
         if connection:
             connection.close()
 
 def batch_processing(batch_size=50):
     """
-    Processes each batch of users (default: 50 per batch) and yields only those over the age of 25.
-    
-    :param batch_size: Number of records to fetch per batch (default: 50)
-    :yield: Filtered user records
+    Generator to process batches of users and yield those over the age of 25.
+    :param batch_size: Number of rows per batch (default: 50)
+    :yield: Filtered user records (one by one)
     """
     for batch in stream_users_in_batches(batch_size):
-        # Filter users older than 25 from the current batch
-        filtered_batch = [user for user in batch if float(user['age']) > 25]
-        if filtered_batch:
-            yield filtered_batch
+        for user in batch:
+            if float(user["age"]) > 25:  # Filtering condition
+                yield user  # Yield one user at a time instead of returning all
 
 # Example usage
 if __name__ == "__main__":
-    for batch in batch_processing():
-        print("Filtered Batch (50 users per batch):")
-        for user in batch:
-            print(user)
+    print("Streaming users over 25 years old:")
+    for user in batch_processing(50):  # Batch size of 50
+        print(user)
