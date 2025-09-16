@@ -32,7 +32,10 @@ class TestAccessNestedMap(unittest.TestCase):
         """Test that access_nested_map raises KeyError as expected"""
         with self.assertRaises(KeyError) as context:
             access_nested_map(nested_map, path)
-        self.assertEqual(str(context.exception), repr(path[-1]))
+        self.assertEqual(
+            str(context.exception),
+            repr(path[-1])
+        )
 
 
 class TestGetJson(unittest.TestCase):
@@ -73,7 +76,11 @@ class TestMemoize(unittest.TestCase):
                 """Memoized property returning result of a_method"""
                 return self.a_method()
 
-        with patch.object(TestClass, "a_method", return_value=42) as mock_method:
+        with patch.object(
+            TestClass,
+            "a_method",
+            return_value=42
+        ) as mock_method:
             obj = TestClass()
 
             result1 = obj.a_property
