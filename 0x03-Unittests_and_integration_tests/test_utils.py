@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """
-Unit tests for utils module functions:
-- access_nested_map
-- get_json
-- memoize
+Unit tests for utils.py module.
+Covers access_nested_map, get_json, and memoize functions.
 """
 
 import unittest
@@ -21,7 +19,7 @@ class TestAccessNestedMap(unittest.TestCase):
         ({"a": {"b": 2}}, ("a", "b"), 2),
     ])
     def test_access_nested_map(self, nested_map, path, expected):
-        """Test that access_nested_map returns the expected result"""
+        """Test access_nested_map with valid inputs"""
         self.assertEqual(access_nested_map(nested_map, path), expected)
 
     @parameterized.expand([
@@ -29,7 +27,7 @@ class TestAccessNestedMap(unittest.TestCase):
         ({"a": 1}, ("a", "b")),
     ])
     def test_access_nested_map_exception(self, nested_map, path):
-        """Test that access_nested_map raises KeyError as expected"""
+        """Test that access_nested_map raises KeyError"""
         with self.assertRaises(KeyError) as context:
             access_nested_map(nested_map, path)
         self.assertEqual(
@@ -45,9 +43,9 @@ class TestGetJson(unittest.TestCase):
         ("http://example.com", {"payload": True}),
         ("http://holberton.io", {"payload": False}),
     ])
-    @patch("utils.requests.get")
+    @patch('utils.requests.get')
     def test_get_json(self, test_url, test_payload, mock_get):
-        """Test that get_json returns expected payload and calls requests.get"""
+        """Test that get_json returns expected result"""
         mock_response = Mock()
         mock_response.json.return_value = test_payload
         mock_get.return_value = mock_response
@@ -59,21 +57,21 @@ class TestGetJson(unittest.TestCase):
 
 
 class TestMemoize(unittest.TestCase):
-    """Unit tests for memoize decorator"""
+    """Unit tests for memoize"""
 
     def test_memoize(self):
-        """Test that memoize caches results and calls method only once"""
+        """Test that memoize caches results"""
 
         class TestClass:
-            """Helper test class for memoization"""
+            """Test helper class"""
 
-            def a_method(self) -> int:
-                """Method returning a fixed integer"""
+            def a_method(self):
+                """Method returning a fixed value"""
                 return 42
 
             @memoize
-            def a_property(self) -> int:
-                """Memoized property returning result of a_method"""
+            def a_property(self):
+                """Memoized property"""
                 return self.a_method()
 
         with patch.object(
@@ -83,11 +81,12 @@ class TestMemoize(unittest.TestCase):
         ) as mock_method:
             obj = TestClass()
 
-            result1 = obj.a_property
-            result2 = obj.a_property
+            # First call executes the method
+            self.assertEqual(obj.a_property, 42)
 
-            self.assertEqual(result1, 42)
-            self.assertEqual(result2, 42)
+            # Second call uses cached value
+            self.assertEqual(obj.a_property, 42)
+
             mock_method.assert_called_once()
 
 
