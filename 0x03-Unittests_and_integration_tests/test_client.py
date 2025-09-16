@@ -23,7 +23,7 @@ class TestGithubOrgClient(unittest.TestCase):
         mock_get_json.return_value = expected_payload
         client = GithubOrgClient(org_name)
 
-        result = client.org()   # must call because it's a memoized method
+        result = client.org   # ✅ no parentheses
 
         mock_get_json.assert_called_once_with(expected_url)
         self.assertEqual(result, expected_payload)
