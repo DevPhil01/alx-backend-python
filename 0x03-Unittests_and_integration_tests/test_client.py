@@ -18,9 +18,12 @@ class TestGithubOrgClient(unittest.TestCase):
     def test_org(self, org_name, mock_get_json):
         """Test that GithubOrgClient.org returns the correct value"""
         expected_url = f"https://api.github.com/orgs/{org_name}"
+        expected_payload = {"org": org_name}
+
+        mock_get_json.return_value = expected_payload
         client = GithubOrgClient(org_name)
 
-        # Call org() since it's a memoized method, not @property
-        client.org()
+        result = client.org()   # must call because it's a memoized method
 
         mock_get_json.assert_called_once_with(expected_url)
+        self.assertEqual(result, expected_payload)
