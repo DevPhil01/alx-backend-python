@@ -20,6 +20,7 @@ class TestGithubOrgClient(unittest.TestCase):
         expected_url = f"https://api.github.com/orgs/{org_name}"
         client = GithubOrgClient(org_name)
 
-        client.org  # Call property to trigger get_json
+        # Call org() since it's a memoized method, not @property
+        client.org()
 
         mock_get_json.assert_called_once_with(expected_url)
