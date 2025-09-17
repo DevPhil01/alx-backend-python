@@ -9,18 +9,13 @@ from client import GithubOrgClient
 from fixtures import org_payload, repos_payload, expected_repos, apache2_repos
 
 
-@parameterized_class((
-    "org_payload",
-    "repos_payload",
-    "expected_repos",
-    "apache2_repos",
-), [
-    (
-        org_payload,
-        repos_payload,
-        expected_repos,
-        apache2_repos,
-    ),
+@parameterized_class([
+    {
+        "org_payload": org_payload,
+        "repos_payload": repos_payload,
+        "expected_repos": expected_repos,
+        "apache2_repos": apache2_repos,
+    }
 ])
 class TestIntegrationGithubOrgClient(unittest.TestCase):
     """Integration tests for the public_repos method"""
@@ -31,7 +26,6 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         cls.get_patcher = patch("requests.get")
         mock_get = cls.get_patcher.start()
 
-        # Define side_effect for mocked requests.get().json()
         def side_effect(url):
             if url.endswith("orgs/google"):
                 return org_payload
@@ -49,12 +43,12 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
     def test_public_repos(self):
         """Test public_repos returns expected repos"""
         client = GithubOrgClient("google")
-        self.assertEqual(client.public_repos(), expected_repos)
+        self.assertEqual(client.public_repos(), self.expected_repos)
 
     def test_public_repos_with_license(self):
         """Test public_repos filters repos by license"""
         client = GithubOrgClient("google")
         self.assertEqual(
             client.public_repos(license="apache-2.0"),
-            apache2_repos,
+            self.apache2_repos,
         )
