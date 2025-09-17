@@ -1,72 +1,119 @@
 #!/usr/bin/env python3
-"""
-Integration tests for GithubOrgClient.public_repos.
+"""Unit and integration tests for GithubOrgClient"""
 
-This file is written to match the grader's exact expectations:
-- uses @parameterized_class with fixtures imported as `import fixtures`
-- creates a class attribute `get_patcher` in setUpClass
-- patches `utils.requests.get` (where utils.get_json looks up requests)
-- stops the patcher in tearDownClass
-"""
 import unittest
-from unittest.mock import patch, Mock
-from parameterized import parameterized_class
-import fixtures
+from unittest.mock import patch, PropertyMock
+from parameterized import parameterized, parameterized_class
+
 from client import GithubOrgClient
+from utils import get_json
+from fixtures import org_payload, repos_payload, expected_repos, apache2_repos
 
 
-@parameterized_class([
-    {
-        "org_payload": fixtures.org_payload,
-        "repos_payload": fixtures.repos_payload,
-        "expected_repos": fixtures.expected_repos,
-        "apache2_repos": fixtures.apache2_repos,
-    },
+class TestGithubOrgClient(unittest.TestCase):
+    """Unit tests for GithubOrgClient"""
+
+    @parameterized.expand([
+        ("google",),
+        ("abc",),
+    ])
+    @patch("client.get_json")
+    def test_org(self, org_name, mock_get_json):
+        """Test org method"""
+        mock_payload = {"login": org_name}
+        mock_get_json.return_value = mock_payload
+
+        client = GithubOrgClient(org_name)
+        result = client.org
+
+        self.assertEqual(result, mock_payload)
+        mock_get_json.assert_called_once_with(
+            f"https://api.github.com/orgs/{org_name}"
+        )
+
+    def test_public_repos_url(self):
+        """Test _public_repos_url property"""
+        with patch(
+            "client.GithubOrgClient.org",
+            new_callable=PropertyMock
+        ) as mock_org:
+            mock_org.return_value = {"repos_url": "http://example.com/repos"}
+
+            client = GithubOrgClient("google")
+            result = client._public_repos_url
+
+            self.assertEqual(result, "http://example.com/repos")
+
+    @patch("client.get_json")
+    def test_public_repos(self, mock_get_json):
+        """Test public_repos method"""
+        mock_payload = [
+            {"name": "repo1"},
+            {"name": "repo2"},
+            {"name": "repo3"},
+        ]
+        mock_get_json.return_value = mock_payload
+
+        with patch(
+            "client.GithubOrgClient._public_repos_url",
+            new_callable=PropertyMock
+        ) as mock_repos_url:
+            mock_repos_url.return_value = "http://example.com/repos"
+
+            client = GithubOrgClient("google")
+            result = client.public_repos()
+
+            self.assertEqual(result, ["repo1", "repo2", "repo3"])
+            mock_repos_url.assert_called_once()
+            mock_get_json.assert_called_once_with("http://example.com/repos")
+
+    @parameterized.expand([
+        ({"license": {"key": "my_license"}}, "my_license", True),
+        ({"license": {"key": "other_license"}}, "my_license", False),
+    ])
+    def test_has_license(self, repo, license_key, expected):
+        """Test has_license static method"""
+        result = GithubOrgClient.has_license(repo, license_key)
+        self.assertEqual(result, expected)
+
+
+@parameterized_class((
+    "org_payload", "repos_payload", "expected_repos", "apache2_repos"
+), [
+    (org_payload, repos_payload, expected_repos, apache2_repos),
 ])
 class TestIntegrationGithubOrgClient(unittest.TestCase):
-    """Integration tests for GithubOrgClient.public_repos."""
+    """Integration tests for GithubOrgClient"""
 
     @classmethod
     def setUpClass(cls):
-        """Start a patcher for utils.requests.get and configure side_effect."""
-        def side_effect(url):
-            """Return an object whose .json() returns the right fixture."""
-            mock_resp = Mock()
-            # exact org URL the client will call for org info
-            org_url = GithubOrgClient.ORG_URL.format(org="google")
-            # repos URL is taken from the org_payload fixture
-            repos_url = cls.org_payload.get("repos_url")
-            if url == org_url:
-                mock_resp.json.return_value = cls.org_payload
-            elif repos_url and url == repos_url:
-                mock_resp.json.return_value = cls.repos_payload
-            else:
-                # default to None / empty payload
-                mock_resp.json.return_value = None
-            return mock_resp
+        """Start patcher for requests.get"""
+        cls.get_patcher = patch("requests.get")
+        mock_get = cls.get_patcher.start()
 
-        # IMPORTANT: patch the requests.get used inside utils.get_json
-        cls.get_patcher = patch("utils.requests.get", side_effect=side_effect)
-        cls.get_patcher.start()
+        def side_effect(url):
+            if "orgs" in url:
+                return unittest.mock.Mock(json=lambda: cls.org_payload)
+            elif "repos" in url:
+                return unittest.mock.Mock(json=lambda: cls.repos_payload)
+            return unittest.mock.Mock(json=lambda: {})
+
+        mock_get.side_effect = side_effect
 
     @classmethod
     def tearDownClass(cls):
-        """Stop the requests.get patcher started in setUpClass."""
+        """Stop patcher"""
         cls.get_patcher.stop()
 
     def test_public_repos(self):
-        """Integration: public_repos returns the expected repo list."""
+        """Test integration of public_repos"""
         client = GithubOrgClient("google")
         self.assertEqual(client.public_repos(), self.expected_repos)
 
     def test_public_repos_with_license(self):
-        """Integration: public_repos filters by license correctly."""
+        """Test integration of public_repos with license filtering"""
         client = GithubOrgClient("google")
         self.assertEqual(
             client.public_repos(license="apache-2.0"),
             self.apache2_repos
         )
-
-
-if __name__ == "__main__":
-    unittest.main()
