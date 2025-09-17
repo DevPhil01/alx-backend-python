@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Unit and integration tests for GithubOrgClient"""
+"""
+Unit and integration tests for GithubOrgClient
+"""
 
 import unittest
 from unittest.mock import patch, PropertyMock
 from parameterized import parameterized, parameterized_class
 
 from client import GithubOrgClient
-from utils import get_json
 from fixtures import org_payload, repos_payload, expected_repos, apache2_repos
 
 
@@ -77,22 +78,25 @@ class TestGithubOrgClient(unittest.TestCase):
         self.assertEqual(result, expected)
 
 
-@parameterized_class((
-    "org_payload", "repos_payload", "expected_repos", "apache2_repos"
-), [
-    (org_payload, repos_payload, expected_repos, apache2_repos),
+@parameterized_class([
+    {
+        "org_payload": org_payload,
+        "repos_payload": repos_payload,
+        "expected_repos": expected_repos,
+        "apache2_repos": apache2_repos,
+    },
 ])
 class TestIntegrationGithubOrgClient(unittest.TestCase):
     """Integration tests for GithubOrgClient"""
 
     @classmethod
     def setUpClass(cls):
-        """Start patcher for requests.get"""
-        cls.get_patcher = patch("requests.get")
+        """Start patcher for utils.requests.get"""
+        cls.get_patcher = patch("utils.requests.get")
         mock_get = cls.get_patcher.start()
 
         def side_effect(url):
-            if "orgs" in url:
+            if "orgs" in url and "repos" not in url:
                 return unittest.mock.Mock(json=lambda: cls.org_payload)
             elif "repos" in url:
                 return unittest.mock.Mock(json=lambda: cls.repos_payload)
@@ -117,3 +121,7 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
             client.public_repos(license="apache-2.0"),
             self.apache2_repos
         )
+
+
+if __name__ == "__main__":
+    unittest.main()
