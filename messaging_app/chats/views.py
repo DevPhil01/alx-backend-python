@@ -1,16 +1,9 @@
-from django.shortcuts import render
-
-# Create your views here.
-
-from django.shortcuts import render
-
-# Create your views here.
 #!/usr/bin/env python3
 """
 ViewSets for the chats app: Conversations and Messages.
 """
 
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
@@ -29,6 +22,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
     queryset = Conversation.objects.all().prefetch_related("participants", "messages")
     serializer_class = ConversationSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    # ✅ Add filter backend to allow searching conversations by participant's name or email
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["participants__first_name", "participants__last_name", "participants__email"]
+    ordering_fields = ["created_at"]
 
     def get_queryset(self):
         """Filter conversations to only those involving the logged-in user."""
@@ -71,6 +69,11 @@ class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all().select_related("sender", "conversation")
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    # ✅ Add filter backend to allow searching messages by text
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["message_body", "sender__email"]
+    ordering_fields = ["sent_at"]
 
     def get_queryset(self):
         """Restrict messages to conversations the user is part of."""
