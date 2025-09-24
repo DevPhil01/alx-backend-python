@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework'
-    'messaging'
+    
 ]
 
 # Django REST Framework settings
@@ -47,6 +47,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated", 
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",  
         "rest_framework.authentication.BasicAuthentication",    # optional
     ],
@@ -133,7 +134,4 @@ STATIC_URL = 'static/'
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-AUTH_USER_MODEL = "messaging.User"
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
