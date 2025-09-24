@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 ViewSets for the chats app: Conversations and Messages.
+
+This module enforces custom permissions so that only participants
+of a conversation can view, update, or send messages.
 """
 
 from rest_framework import viewsets, permissions, status, filters
@@ -9,6 +12,7 @@ from django.shortcuts import get_object_or_404
 
 from .models import Conversation, Message, User
 from .serializers import ConversationSerializer, MessageSerializer
+from .permissions import IsParticipantOfConversation
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -21,9 +25,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     queryset = Conversation.objects.all().prefetch_related("participants", "messages")
     serializer_class = ConversationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # ✅ Apply custom participant-based permissions
+    permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
 
-    # ✅ Add filter backend to allow searching conversations by participant's name or email
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["participants__first_name", "participants__last_name", "participants__email"]
     ordering_fields = ["created_at"]
@@ -68,9 +72,9 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     queryset = Message.objects.all().select_related("sender", "conversation")
     serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # ✅ Apply custom participant-based permissions
+    permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
 
-    # ✅ Add filter backend to allow searching messages by text
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["message_body", "sender__email"]
     ordering_fields = ["sent_at"]
