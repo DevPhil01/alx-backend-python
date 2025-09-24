@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 from .models import Conversation, Message, User
 from .serializers import ConversationSerializer, MessageSerializer
 from .permissions import IsParticipantOfConversation
+from .pagination import MessagePagination  # ✅ External pagination class
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -25,7 +26,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     queryset = Conversation.objects.all().prefetch_related("participants", "messages")
     serializer_class = ConversationSerializer
-    # ✅ Apply custom participant-based permissions
     permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
 
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -72,12 +72,14 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     queryset = Message.objects.all().select_related("sender", "conversation")
     serializer_class = MessageSerializer
-    # ✅ Apply custom participant-based permissions
     permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
 
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["message_body", "sender__email"]
     ordering_fields = ["sent_at"]
+
+    # ✅ Apply pagination (20 per page)
+    pagination_class = MessagePagination
 
     def get_queryset(self):
         """Restrict messages to conversations the user is part of."""
@@ -97,7 +99,10 @@ class MessageViewSet(viewsets.ModelViewSet):
         message_body = request.data.get("message_body")
 
         if not conversation_id or not message_body:
-            return Response({"error": "conversation_id and message_body are required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "conversation_id and message_body are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         conversation = get_object_or_404(Conversation, conversation_id=conversation_id)
 
