@@ -11,6 +11,7 @@ Supports:
 """
 
 from rest_framework import permissions
+from .models import Message, Conversation
 
 
 class IsParticipantOfConversation(permissions.BasePermission):
@@ -34,15 +35,25 @@ class IsParticipantOfConversation(permissions.BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        # Only participants of the conversation can interact
-        if request.user in obj.participants.all():
-            # SAFE_METHODS = GET, HEAD, OPTIONS
-            if request.method in permissions.SAFE_METHODS:
-                return True
+        # Case 1: The object is a Conversation
+        if isinstance(obj, Conversation):
+            is_participant = request.user in obj.participants.all()
 
-            # Explicitly allow write/unsafe methods
-            if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-                return True
+        # Case 2: The object is a Message (check its parent conversation)
+        elif isinstance(obj, Message):
+            is_participant = request.user in obj.conversation.participants.all()
 
-        # Deny access otherwise
+        else:
+            # Unsupported object type → deny access
+            return False
+
+        # ✅ If user is a participant, allow safe methods (GET, HEAD, OPTIONS)
+        if is_participant and request.method in permissions.SAFE_METHODS:
+            return True
+
+        # ✅ Allow participants to perform unsafe methods (POST, PUT, PATCH, DELETE)
+        if is_participant and request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+            return True
+
+        # 🚫 Deny access otherwise
         return False
