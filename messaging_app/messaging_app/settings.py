@@ -37,20 +37,34 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework'
-    
+
+    # Third-party
+    'rest_framework',
+    'django_filters',
+
+    # Local apps
+    'chats',
 ]
 
 # Django REST Framework settings
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "chats.permissions.IsParticipantOfConversation",
-        "rest_framework.permissions.IsAuthenticated", 
+        "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",  
-        "rest_framework.authentication.BasicAuthentication",    # optional
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",  # optional
+    ],
+    # ✅ Enable global pagination
+    "DEFAULT_PAGINATION_CLASS": "chats.pagination.MessagePagination",
+    "PAGE_SIZE": 20,
+    # ✅ Enable global filtering
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
     ],
 }
 
@@ -136,4 +150,3 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
