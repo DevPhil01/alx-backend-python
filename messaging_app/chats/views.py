@@ -1,19 +1,22 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 
 """
 ViewSets for the chats app: Conversations and Messages.
 
 This module enforces custom permissions so that only participants
 of a conversation can view, update, or send messages.
+It also implements pagination and filtering.
 """
 
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import Conversation, Message, User
 from .serializers import ConversationSerializer, MessageSerializer
 from .permissions import IsParticipantOfConversation
-from .pagination import MessagePagination  # ✅ External pagination class
+from .pagination import MessagePagination
+from .filters import ConversationFilter, MessageFilter
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -28,7 +31,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
     permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
 
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    # ✅ Enable filtering, searching, and ordering
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = ConversationFilter
     search_fields = ["participants__first_name", "participants__last_name", "participants__email"]
     ordering_fields = ["created_at"]
 
@@ -74,12 +79,12 @@ class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
 
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    # ✅ Enable pagination + filtering, searching, and ordering
+    pagination_class = MessagePagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = MessageFilter
     search_fields = ["message_body", "sender__email"]
     ordering_fields = ["sent_at"]
-
-    # ✅ Apply pagination (20 per page)
-    pagination_class = MessagePagination
 
     def get_queryset(self):
         """Restrict messages to conversations the user is part of."""
@@ -101,7 +106,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         if not conversation_id or not message_body:
             return Response(
                 {"error": "conversation_id and message_body are required"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         conversation = get_object_or_404(Conversation, conversation_id=conversation_id)
