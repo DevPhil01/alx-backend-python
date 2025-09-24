@@ -47,13 +47,14 @@ class IsParticipantOfConversation(permissions.BasePermission):
             # Unsupported object type → deny access
             return False
 
-        # ✅ If user is a participant, allow safe methods (GET, HEAD, OPTIONS)
+        # If user is a participant, allow safe methods (GET, HEAD, OPTIONS)
         if is_participant and request.method in permissions.SAFE_METHODS:
             return True
 
-        # ✅ Allow participants to perform unsafe methods (POST, PUT, PATCH, DELETE)
+        # Allow participants to perform unsafe methods (POST, PUT, PATCH, DELETE)
         if is_participant and request.method in ["POST", "PUT", "PATCH", "DELETE"]:
             return True
 
-        # 🚫 Deny access otherwise
+        # Deny access otherwise
         return False
+
