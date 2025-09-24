@@ -1,79 +1,47 @@
 #!/usr/bin/env python3
 """
-Custom permission classes for the chats app.
+Custom permissions for the chats app.
 
-These permissions ensure that users can only access
-their own conversations and messages.
+This file defines object-level permissions to ensure that only users
+who are participants of a conversation can access or modify it.
 
-Author: Your Name
-Date: 2025-09-24
+Supports:
+- Safe methods: GET, HEAD, OPTIONS
+- Write methods: POST, PUT, PATCH, DELETE
 """
 
 from rest_framework import permissions
 
 
-class IsOwner(permissions.BasePermission):
-    """
-    Object-level permission to allow only the owner of an object to access it.
-
-    Works for models that have a `user` or `sender` field
-    linking the object to a user.
-    """
-
-    def has_object_permission(self, request, view, obj):
-        owner = getattr(obj, "user", None) or getattr(obj, "sender", None)
-        return owner == request.user
-
-
-class IsConversationParticipant(permissions.BasePermission):
-    """
-    Permission to ensure that only participants of a conversation
-    can view or modify it.
-
-    Requires the Conversation model to have a `participants` field.
-    """
-
-    def has_object_permission(self, request, view, obj):
-        participants = getattr(obj, "participants", None)
-        if participants is None:
-            return False
-        return request.user in participants.all()
-
-
 class IsParticipantOfConversation(permissions.BasePermission):
     """
-    Custom permission class to:
-    - Allow only authenticated users access to the API
-    - Ensure only participants in a conversation can send, view,
-      update, or delete messages within it
+    Custom permission to allow only participants of a conversation
+    to view or modify it.
     """
-
-    def has_permission(self, request, view):
-        # ✅ Only authenticated users can access the API
-        return request.user and request.user.is_authenticated
 
     def has_object_permission(self, request, view, obj):
         """
-        Check object-level access:
-        - If the object is a Conversation, user must be a participant
-        - If the object is a Message, user must be part of the related conversation
+        Object-level permission check.
+        Ensures the requesting user is part of the conversation.
+
+        Args:
+            request: The HTTP request instance.
+            view: The DRF view where the permission is applied.
+            obj: The object (Conversation) being accessed.
+
+        Returns:
+            bool: True if the user is allowed, False otherwise.
         """
-        from .models import Conversation, Message
 
-        if isinstance(obj, Conversation):
-            return request.user in obj.participants.all()
+        # Only participants of the conversation can interact
+        if request.user in obj.participants.all():
+            # SAFE_METHODS = GET, HEAD, OPTIONS
+            if request.method in permissions.SAFE_METHODS:
+                return True
 
-        if isinstance(obj, Message):
-            return request.user in obj.conversation.participants.all()
+            # Explicitly handle write/unsafe methods
+            if request.method in ["PUT", "PATCH", "DELETE", "POST"]:
+                return True
 
+        # Deny access if user is not a participant
         return False
-
-
-class ReadOnly(permissions.BasePermission):
-    """
-    Permission class that allows read-only access to all requests,
-    but restricts modifications to authenticated users only.
-    """
-
-    def has_permission(self, request, view):
-        return request.method in permissions.SAFE_METHODS
