@@ -43,6 +43,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+    #custom middlewares
     "chats.middleware.RequestLoggingMiddleware",  #  Custom middleware for request logging
     "chats.middleware.RestrictAccessByTimeMiddleware", # middleware for time restriction
 ]
@@ -128,4 +130,5 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
     ],
 }
+
 
