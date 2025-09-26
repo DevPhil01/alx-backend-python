@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 """
-Custom middlewares for the chats app:
-1. RequestLoggingMiddleware → Logs every user request
-2. RestrictAccessByTimeMiddleware → Restricts access outside 6AM–9PM
-3. OffensiveLanguageMiddleware → Limits messages per IP (rate limiting)
+Middleware for logging, restricting access by time, rate limiting,
+and role-based permissions in the chats app.
 """
 
 import logging
 from datetime import datetime, timedelta
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponseForbidden
 
-# ---------------------------
-# Setup logger
-# ---------------------------
+# Setup logger for request logging
 logger = logging.getLogger(__name__)
 handler = logging.FileHandler("requests.log")
-formatter = logging.Formatter("%(message)s")
+formatter = logging.Formatter("%(asctime)s - %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
@@ -29,13 +25,12 @@ class RequestLoggingMiddleware:
 
     def __call__(self, request):
         user = request.user if request.user.is_authenticated else "Anonymous"
-        log_entry = f"{datetime.now()} - User: {user} - Path: {request.path}"
-        logger.info(log_entry)
+        logger.info(f"User: {user} - Path: {request.path}")
         return self.get_response(request)
 
 
 class RestrictAccessByTimeMiddleware:
-    """Restricts access outside 6AM–9PM."""
+    """Restricts access outside 6AM - 9PM server time."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -43,58 +38,66 @@ class RestrictAccessByTimeMiddleware:
     def __call__(self, request):
         current_hour = datetime.now().hour
         if current_hour < 6 or current_hour >= 21:
-            return HttpResponseForbidden(
-                "Access restricted. Try again between 6AM and 9PM."
-            )
+            return HttpResponseForbidden("Access restricted during this time.")
         return self.get_response(request)
 
 
 class OffensiveLanguageMiddleware:
     """
-    Middleware to limit number of chat messages from a single IP.
-    Allows max 5 messages per 1-minute window per IP.
+    Middleware to rate-limit messages based on IP address.
+    Allows max 5 messages/minute per IP.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
-        # Dictionary to track message count per IP: { ip: [timestamps] }
-        self.message_log = {}
+        self.ip_request_log = {}
 
     def __call__(self, request):
-        # Apply only to POST requests to messages endpoint
-        if request.method == "POST" and "messages" in request.path.lower():
+        if request.method == "POST" and "/messages" in request.path:
             ip = self.get_client_ip(request)
             now = datetime.now()
+            request_times = self.ip_request_log.get(ip, [])
 
-            # Initialize list if IP not tracked
-            if ip not in self.message_log:
-                self.message_log[ip] = []
-
-            # Filter timestamps to only keep those within the last 60s
-            one_minute_ago = now - timedelta(minutes=1)
-            self.message_log[ip] = [
-                ts for ts in self.message_log[ip] if ts > one_minute_ago
+            # Filter only requests within the last minute
+            request_times = [
+                t for t in request_times if now - t < timedelta(minutes=1)
             ]
 
-            # Enforce rate limit
-            if len(self.message_log[ip]) >= 5:
-                return JsonResponse(
-                    {
-                        "error": "Rate limit exceeded. "
-                        "You can only send 5 messages per minute."
-                    },
-                    status=429,
+            if len(request_times) >= 5:
+                return HttpResponseForbidden(
+                    "Rate limit exceeded: Max 5 messages per minute."
                 )
 
-            # Log the new message timestamp
-            self.message_log[ip].append(now)
+            request_times.append(now)
+            self.ip_request_log[ip] = request_times
 
         return self.get_response(request)
 
-    @staticmethod
-    def get_client_ip(request):
-        """Extract client IP from request headers or META."""
+    def get_client_ip(self, request):
+        """Extract client IP address."""
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
             return x_forwarded_for.split(",")[0]
-        return request.META.get("REMOTE_ADDR", "unknown")
+        return request.META.get("REMOTE_ADDR")
+
+
+class RolePermissionMiddleware:
+    """
+    Middleware to check user role before granting access.
+    Only 'admin' or 'moderator' roles are allowed.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated:
+            # Check role from user model (assuming 'role' field exists)
+            user_role = getattr(request.user, "role", None)
+
+            if user_role not in ["admin", "moderator"]:
+                return HttpResponseForbidden(
+                    "You do not have permission to access this resource."
+                )
+
+        return self.get_response(request)
