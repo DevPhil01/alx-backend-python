@@ -48,7 +48,7 @@ MIDDLEWARE = [
     "chats.middleware.RequestLoggingMiddleware",  #  Custom middleware for request logging
     "chats.middleware.RestrictAccessByTimeMiddleware", # middleware for time restriction
     "chats.middleware.OffensiveLanguageMiddleware", # middleware for offensive language
-    "chats.middleware.RolePermissionMiddleware",# middleware to check user roles and limit access to admin or moderator
+    "chats.middleware.RolepermissionMiddleware",# middleware to check user roles and limit access to admin or moderator
 ]
 
 ROOT_URLCONF = "messaging_app.urls"
@@ -132,6 +132,7 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
     ],
 }
+
 
 
 
