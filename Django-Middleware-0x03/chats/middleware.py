@@ -1,39 +1,36 @@
 #!/usr/bin/env python3
 """
-Custom middleware for logging user requests.
+Middleware to restrict access to the messaging app
+based on server time.
 
-This middleware logs every incoming request with the timestamp,
-user (if authenticated), and the request path.
+Only allows access between 06:00 and 21:00 (6 AM - 9 PM).
+Outside these hours, requests return HTTP 403 Forbidden.
 """
 
-import logging
 from datetime import datetime
+from django.http import HttpResponseForbidden
 
-from django.utils.deprecation import MiddlewareMixin
 
-
-class RequestLoggingMiddleware:
+class RestrictAccessByTimeMiddleware:
     """
-    Middleware to log requests with timestamp, user, and request path.
+    Middleware that restricts access to the chats app
+    outside of working hours (6AM - 9PM).
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
-        # Configure logger
-        self.logger = logging.getLogger("request_logger")
-        handler = logging.FileHandler("requests.log")
-        formatter = logging.Formatter("%(message)s")
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        self.logger.setLevel(logging.INFO)
 
     def __call__(self, request):
-        # Get user or mark as Anonymous
-        user = request.user if request.user.is_authenticated else "Anonymous"
+        # Get current server time (24-hour format)
+        current_hour = datetime.now().hour
 
-        # Log request details
-        self.logger.info(f"{datetime.now()} - User: {user} - Path: {request.path}")
+        # Allowed window: 6 <= hour < 21
+        if current_hour < 6 or current_hour >= 21:
+            return HttpResponseForbidden(
+                "Access to the messaging app is restricted at this time. "
+                "Please try again between 6AM and 9PM."
+            )
 
-        # Continue processing
+        # Continue normal request processing
         response = self.get_response(request)
         return response
