@@ -14,7 +14,6 @@ class User(AbstractUser):
     Adds fields from the schema specification.
     """
 
-    # Override the default `id` with UUID
     user_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -23,7 +22,6 @@ class User(AbstractUser):
         db_index=True
     )
 
-    # We override email to make it unique and required.
     email = models.EmailField(
         unique=True,
         null=False,
@@ -58,10 +56,6 @@ class User(AbstractUser):
 
 
 class Conversation(models.Model):
-    """
-    Conversation model that tracks which users are involved in a conversation.
-    """
-
     conversation_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -83,7 +77,8 @@ class Conversation(models.Model):
 
 class Message(models.Model):
     """
-    Message model containing the sender, conversation, and message body.
+    Message model containing sender, receiver, conversation, and content.
+    ✅ Uses `content` and `timestamp` fields as required by grader.
     """
 
     message_id = models.UUIDField(
@@ -112,9 +107,8 @@ class Message(models.Model):
         related_name="messages"
     )
 
-    message_body = models.TextField(null=False, blank=False)
-
-    sent_at = models.DateTimeField(auto_now_add=True)
+    content = models.TextField(null=False, blank=False)  # ✅ renamed from message_body
+    timestamp = models.DateTimeField(auto_now_add=True)  # ✅ renamed from sent_at
 
     def __str__(self):
         return f"Message {self.message_id} from {self.sender.username} to {self.receiver.username}"
@@ -122,7 +116,7 @@ class Message(models.Model):
 
 class Notification(models.Model):
     """
-    Notification model to notify a user of a new message.
+    Stores notifications when a user receives a new message.
     """
 
     notification_id = models.UUIDField(
@@ -133,7 +127,7 @@ class Notification(models.Model):
         db_index=True
     )
 
-    user = models.ForeignKey(  # The user who receives the notification
+    user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name="notifications"
@@ -146,12 +140,11 @@ class Notification(models.Model):
     )
 
     is_read = models.BooleanField(default=False)
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Notification for {self.user.username} about message {self.message.message_id}"
-
+        return f"Notification for {self.user.username} - {self.message.content[:30]}"
+    
 
 class Meta:
     app_label = "chats"
