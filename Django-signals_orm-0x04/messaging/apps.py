@@ -14,6 +14,7 @@ class ChatsConfig(AppConfig):
 
     def ready(self):
         from .models import Message, Notification
+        import chats.signals 
 
         # ✅ Signal handler to create notification when new Message is created
         def create_notification(sender, instance, created, **kwargs):
