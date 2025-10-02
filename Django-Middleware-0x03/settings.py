@@ -44,11 +44,11 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 
-    #custom middlewares
-    "chats.middleware.RequestLoggingMiddleware",  #  Custom middleware for request logging
+    # custom middlewares
+    "chats.middleware.RequestLoggingMiddleware",  # Custom middleware for request logging
     "chats.middleware.RestrictAccessByTimeMiddleware", # middleware for time restriction
     "chats.middleware.OffensiveLanguageMiddleware", # middleware for offensive language
-    "chats.middleware.RolepermissionMiddleware",# middleware to check user roles and limit access to admin or moderator
+    "chats.middleware.RolepermissionMiddleware", # middleware to check user roles and limit access
 ]
 
 ROOT_URLCONF = "messaging_app.urls"
@@ -73,7 +73,6 @@ WSGI_APPLICATION = "messaging_app.wsgi.application"
 
 
 # Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -84,18 +83,10 @@ DATABASES = {
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 
@@ -106,7 +97,7 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
+# Static files
 STATIC_URL = "static/"
 
 
@@ -124,8 +115,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",  # ✅ explicit
-    "PAGE_SIZE": 20,  # ✅ matches requirement
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.OrderingFilter",
@@ -134,6 +125,10 @@ REST_FRAMEWORK = {
 }
 
 
-
-
-
+# ✅ Caching configuration
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
+    }
+}
