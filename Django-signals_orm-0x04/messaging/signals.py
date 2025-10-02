@@ -1,22 +1,39 @@
-import logging
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from .models import Message, Notification
+"""
+Signals for the chats app.
+"""
 
-logger = logging.getLogger(__name__)
+from django.db.models.signals import post_save, pre_save
+from django.dispatch import receiver
+from django.utils import timezone
+from .models import Message, Notification, MessageHistory
 
 
 @receiver(post_save, sender=Message)
 def create_notification(sender, instance, created, **kwargs):
-    """
-    Automatically create a Notification when a new Message is created.
-    """
+    """Create a notification when a new message is sent."""
     if created:
+        Notification.objects.create(user=instance.receiver, message=instance)
+
+
+@receiver(pre_save, sender=Message)
+def log_message_edit(sender, instance, **kwargs):
+    """
+    Before a message is saved, if it's being updated (not created),
+    save its old content into MessageHistory.
+    """
+    if not instance._state.adding:  # means it's an update, not a new message
         try:
-            Notification.objects.create(
-                user=instance.receiver,   # receiver of the message
-                message=instance
-            )
-            logger.info(f"Notification created for {instance.receiver.username} on message {instance.message_id}")
-        except Exception as e:
-            logger.error(f"Failed to create notification: {e}")
+            old_instance = Message.objects.get(pk=instance.pk)
+            if old_instance.content != instance.content:
+                # Mark message as edited
+                instance.edited = True
+
+                # Save old content to history
+                MessageHistory.objects.create(
+                    message=instance,
+                    old_content=old_instance.content,
+                    edited_at=timezone.now(),
+                    edited_by=instance.edited_by  # track who made the edit
+                )
+        except Message.DoesNotExist:
+            pass
