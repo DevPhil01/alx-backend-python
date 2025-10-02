@@ -4,11 +4,12 @@ ViewSets for the chats app: Conversations and Messages.
 
 This module enforces custom permissions so that only participants
 of a conversation can view, update, or send messages.
-It also implements pagination, filtering, notifications, and edit tracking.
+It also implements pagination, filtering, notifications, edit tracking, and unread message queries.
 """
 
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes, action
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -74,9 +75,10 @@ class MessageViewSet(viewsets.ModelViewSet):
     - retrieve: get a single message
     - create: send a new message in a conversation
     - update: edit a message (with history tracking)
+    - unread: list unread messages for the current user
     """
 
-    queryset = Message.objects.all().select_related("sender", "receiver", "conversation")
+    queryset = Message.objects.all().select_related("sender", "conversation")
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
 
@@ -84,13 +86,13 @@ class MessageViewSet(viewsets.ModelViewSet):
     pagination_class = MessagePagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = MessageFilter
-    search_fields = ["content", "sender__email"]
-    ordering_fields = ["timestamp"]
+    search_fields = ["message_body", "sender__email"]
+    ordering_fields = ["sent_at"]
 
     def get_queryset(self):
         """Restrict messages to conversations the user is part of."""
         user = self.request.user
-        return Message.objects.filter(conversation__participants=user).select_related("sender", "receiver", "conversation")
+        return Message.objects.filter(conversation__participants=user).select_related("sender", "conversation")
 
     def create(self, request, *args, **kwargs):
         """
@@ -98,36 +100,35 @@ class MessageViewSet(viewsets.ModelViewSet):
         Expected payload:
         {
             "conversation_id": "<uuid>",
-            "receiver_id": "<uuid>",
-            "content": "Hello there"
+            "message_body": "Hello there",
+            "parent_message_id": "<uuid>" (optional, for replies)
         }
         """
         conversation_id = request.data.get("conversation_id")
-        receiver_id = request.data.get("receiver_id")
-        content = request.data.get("content")
+        message_body = request.data.get("message_body")
+        parent_message_id = request.data.get("parent_message_id")
 
-        if not conversation_id or not receiver_id or not content:
+        if not conversation_id or not message_body:
             return Response(
-                {"error": "conversation_id, receiver_id and content are required"},
+                {"error": "conversation_id and message_body are required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         conversation = get_object_or_404(Conversation, conversation_id=conversation_id)
-        receiver = get_object_or_404(User, user_id=receiver_id)
 
         # Ensure user is a participant
         if request.user not in conversation.participants.all():
             return Response({"error": "You are not part of this conversation"}, status=status.HTTP_403_FORBIDDEN)
 
-        # Ensure receiver is also a participant
-        if receiver not in conversation.participants.all():
-            return Response({"error": "Receiver must be part of the conversation"}, status=status.HTTP_400_BAD_REQUEST)
+        parent_message = None
+        if parent_message_id:
+            parent_message = get_object_or_404(Message, message_id=parent_message_id)
 
         message = Message.objects.create(
             sender=request.user,
-            receiver=receiver,
             conversation=conversation,
-            content=content,
+            message_body=message_body,
+            parent_message=parent_message
         )
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -137,7 +138,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         Edit a message.
         Expected payload:
         {
-            "content": "Updated text"
+            "message_body": "Updated text"
         }
         """
         partial = kwargs.pop("partial", False)
@@ -147,16 +148,32 @@ class MessageViewSet(viewsets.ModelViewSet):
         if instance.sender != request.user:
             return Response({"error": "You can only edit your own messages"}, status=status.HTTP_403_FORBIDDEN)
 
-        new_content = request.data.get("content")
-        if not new_content:
-            return Response({"error": "content is required"}, status=status.HTTP_400_BAD_REQUEST)
+        new_body = request.data.get("message_body")
+        if not new_body:
+            return Response({"error": "message_body is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        instance.content = new_content
+        instance.message_body = new_body
         instance.edited_by = request.user
+        instance.edited = True
         instance.save()
 
         serializer = self.get_serializer(instance, partial=partial)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="unread")
+    def unread_messages(self, request):
+        """
+        List unread messages for the logged-in user.
+        """
+        user = request.user
+        unread_qs = Message.unread.for_user(user)
+        page = self.paginate_queryset(unread_qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(unread_qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 @api_view(["DELETE"])
 @permission_classes([permissions.IsAuthenticated])
