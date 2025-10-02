@@ -6,6 +6,7 @@ Models for the chats app: User, Conversation, Message, MessageHistory, and Notif
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from .managers import UnreadMessagesManager
 
 
 class User(AbstractUser):
@@ -14,7 +15,6 @@ class User(AbstractUser):
     Adds fields from the schema specification.
     """
 
-    # Override the default `id` with UUID
     user_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -80,21 +80,6 @@ class Conversation(models.Model):
         return f"Conversation {self.conversation_id}"
 
 
-class UnreadMessagesManager(models.Manager):
-    """
-    Custom manager to filter unread messages for a given user.
-    Optimized with `.only()` to fetch minimal fields.
-    """
-
-    def for_user(self, user):
-        return (
-            self.get_queryset()
-            .filter(conversation__participants=user, read=False)
-            .only("message_id", "sender", "message_body", "sent_at", "conversation")
-            .select_related("sender", "conversation")
-        )
-
-
 class Message(models.Model):
     """
     Message model containing the sender, conversation, and message body.
@@ -125,7 +110,7 @@ class Message(models.Model):
 
     sent_at = models.DateTimeField(auto_now_add=True)
 
-    # ✅ NEW: Threaded replies
+    # ✅ Threaded replies
     parent_message = models.ForeignKey(
         "self",
         null=True,
@@ -144,11 +129,11 @@ class Message(models.Model):
         related_name="edited_messages"
     )
 
-    # ✅ NEW: Track read/unread status
+    # ✅ Track if message is read
     read = models.BooleanField(default=False)
 
-    # ✅ Attach the custom unread manager
-    objects = models.Manager()  # default manager
+    # Managers
+    objects = models.Manager()  # default
     unread = UnreadMessagesManager()  # custom manager
 
     def __str__(self):
