@@ -157,3 +157,16 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(instance, partial=partial)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(["DELETE"])
+@permission_classes([permissions.IsAuthenticated])
+def delete_user(request):
+    """
+    Allow a user to delete their account.
+    This triggers the post_delete signal to clean up related messages,
+    notifications, and message histories automatically.
+    """
+    user = request.user
+    user.delete()
+    return Response({"message": "Your account and related data have been deleted."},
+                    status=status.HTTP_204_NO_CONTENT)
