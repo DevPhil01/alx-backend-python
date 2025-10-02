@@ -4,7 +4,8 @@ ViewSets for the chats app: Conversations and Messages.
 
 This module enforces custom permissions so that only participants
 of a conversation can view, update, or send messages.
-It also implements pagination, filtering, notifications, edit tracking, and unread message queries.
+It also implements pagination, filtering, notifications, edit tracking, unread message queries,
+and caching of conversation messages.
 """
 
 from rest_framework import viewsets, permissions, status, filters
@@ -12,6 +13,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, action
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 
 from .models import Conversation, Message, User, Notification
 from .serializers import ConversationSerializer, MessageSerializer
@@ -71,7 +74,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 class MessageViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Messages.
-    - list: show all messages in a conversation
+    - list: show all messages in a conversation (cached for 60s)
     - retrieve: get a single message
     - create: send a new message in a conversation
     - update: edit a message (with history tracking)
@@ -93,6 +96,11 @@ class MessageViewSet(viewsets.ModelViewSet):
         """Restrict messages to conversations the user is part of."""
         user = self.request.user
         return Message.objects.filter(conversation__participants=user).select_related("sender", "conversation")
+
+    # ✅ Cache the list view for 60 seconds
+    @method_decorator(cache_page(60))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         """
