@@ -23,9 +23,6 @@ class User(AbstractUser):
         db_index=True
     )
 
-    # These already exist in AbstractUser:
-    # first_name, last_name, password, email, username
-    # We override email to make it unique and required.
     email = models.EmailField(
         unique=True,
         null=False,
@@ -83,6 +80,21 @@ class Conversation(models.Model):
         return f"Conversation {self.conversation_id}"
 
 
+class UnreadMessagesManager(models.Manager):
+    """
+    Custom manager to filter unread messages for a given user.
+    Optimized with `.only()` to fetch minimal fields.
+    """
+
+    def for_user(self, user):
+        return (
+            self.get_queryset()
+            .filter(conversation__participants=user, read=False)
+            .only("message_id", "sender", "message_body", "sent_at", "conversation")
+            .select_related("sender", "conversation")
+        )
+
+
 class Message(models.Model):
     """
     Message model containing the sender, conversation, and message body.
@@ -122,7 +134,7 @@ class Message(models.Model):
         related_name="replies"
     )
 
-    # ✅ NEW: Track edits
+    # ✅ Track edits
     edited = models.BooleanField(default=False)
     edited_by = models.ForeignKey(
         User,
@@ -131,6 +143,13 @@ class Message(models.Model):
         on_delete=models.SET_NULL,
         related_name="edited_messages"
     )
+
+    # ✅ NEW: Track read/unread status
+    read = models.BooleanField(default=False)
+
+    # ✅ Attach the custom unread manager
+    objects = models.Manager()  # default manager
+    unread = UnreadMessagesManager()  # custom manager
 
     def __str__(self):
         return f"Message {self.message_id} from {self.sender.username}"
