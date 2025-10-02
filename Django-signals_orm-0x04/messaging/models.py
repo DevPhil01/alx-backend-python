@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Models for the chats/messaging app: User, Conversation, Message, MessageHistory, and Notification.
+Models for the chats app: User, Conversation, Message, MessageHistory, and Notification.
 """
 
 import uuid
@@ -23,7 +23,8 @@ class User(AbstractUser):
         db_index=True
     )
 
-    # Already exist in AbstractUser: first_name, last_name, password, email, username
+    # These already exist in AbstractUser:
+    # first_name, last_name, password, email, username
     # We override email to make it unique and required.
     email = models.EmailField(
         unique=True,
@@ -84,7 +85,8 @@ class Conversation(models.Model):
 
 class Message(models.Model):
     """
-    Message model containing the sender, receiver, conversation, and message body.
+    Message model containing the sender, conversation, and message body.
+    Supports threaded replies via parent_message and edit history.
     """
 
     message_id = models.UUIDField(
@@ -98,13 +100,7 @@ class Message(models.Model):
     sender = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="messages_sent"
-    )
-
-    receiver = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="messages_received"
+        related_name="messages"
     )
 
     conversation = models.ForeignKey(
@@ -113,68 +109,113 @@ class Message(models.Model):
         related_name="messages"
     )
 
-    content = models.TextField(null=False, blank=False)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    message_body = models.TextField(null=False, blank=False)
 
-    # Edit tracking
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    # ✅ NEW: Threaded replies
+    parent_message = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="replies"
+    )
+
+    # ✅ NEW: Track edits
     edited = models.BooleanField(default=False)
     edited_by = models.ForeignKey(
         User,
-        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="messages_edited"
+        on_delete=models.SET_NULL,
+        related_name="edited_messages"
     )
 
     def __str__(self):
         return f"Message {self.message_id} from {self.sender.username}"
 
+    def get_thread(self):
+        """
+        Recursively fetch all replies to this message (threaded).
+        Returns a nested structure of messages.
+        """
+        replies = self.replies.all().select_related("sender").prefetch_related("replies")
+        return [
+            {
+                "id": reply.message_id,
+                "sender": reply.sender.username,
+                "content": reply.message_body,
+                "sent_at": reply.sent_at,
+                "replies": reply.get_thread()
+            }
+            for reply in replies
+        ]
+
 
 class MessageHistory(models.Model):
     """
-    Stores previous versions of messages when edited.
+    Stores previous versions of edited messages.
     """
+
+    history_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True
+    )
 
     message = models.ForeignKey(
         Message,
         on_delete=models.CASCADE,
         related_name="history"
     )
+
     old_content = models.TextField()
+
     edited_at = models.DateTimeField(auto_now_add=True)
+
     edited_by = models.ForeignKey(
         User,
-        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="message_histories"
+        on_delete=models.SET_NULL,
+        related_name="edit_histories"
     )
 
     def __str__(self):
-        return f"History of {self.message.message_id} at {self.edited_at}"
+        return f"History for Message {self.message.message_id} at {self.edited_at}"
 
 
 class Notification(models.Model):
     """
-    Notification model to alert users when they receive new messages.
+    Notifications for users when they receive new messages.
     """
+
+    notification_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True
+    )
 
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name="notifications"
     )
+
     message = models.ForeignKey(
         Message,
         on_delete=models.CASCADE,
         related_name="notifications"
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+
     is_read = models.BooleanField(default=False)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+
     def __str__(self):
-        return f"Notification for {self.user.username} about {self.message.message_id}"
-
-
-class Meta:
-    app_label = "chats"
+        return f"Notification for {self.user.username} about message {self.message.message_id}"
