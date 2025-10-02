@@ -6,9 +6,6 @@ Models for the chats app: User, Conversation, Message, Notification, and Message
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.db.models.signals import post_save, pre_save
-from django.dispatch import receiver
-from django.utils import timezone
 
 
 class User(AbstractUser):
@@ -73,6 +70,15 @@ class Message(models.Model):
     # ✅ Track if the message was edited
     edited = models.BooleanField(default=False)
 
+    # ✅ Who edited the message last (can be None if never edited)
+    edited_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="messages_edited"
+    )
+
     def __str__(self):
         return f"Message {self.message_id} from {self.sender.username}"
 
@@ -91,6 +97,13 @@ class MessageHistory(models.Model):
     message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="history")
     old_content = models.TextField()
     edited_at = models.DateTimeField(auto_now_add=True)
+    edited_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="message_histories"
+    )
 
     def __str__(self):
         return f"History of Message {self.message.message_id} at {self.edited_at}"
@@ -114,34 +127,3 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.user.username} about Message {self.message.message_id}"
-
-
-# 🔹 Signals
-
-@receiver(post_save, sender=Message)
-def create_notification(sender, instance, created, **kwargs):
-    """Create a notification when a new message is sent."""
-    if created:
-        Notification.objects.create(user=instance.receiver, message=instance)
-
-
-@receiver(pre_save, sender=Message)
-def log_message_edit(sender, instance, **kwargs):
-    """
-    Before a message is saved, if it's being updated (not created),
-    save its old content into MessageHistory.
-    """
-    if not instance._state.adding:  # means it's an update, not a new message
-        try:
-            old_instance = Message.objects.get(pk=instance.pk)
-            if old_instance.content != instance.content:
-                # Mark message as edited
-                instance.edited = True
-                # Save old content to history
-                MessageHistory.objects.create(
-                    message=instance,
-                    old_content=old_instance.content,
-                    edited_at=timezone.now()
-                )
-        except Message.DoesNotExist:
-            pass
