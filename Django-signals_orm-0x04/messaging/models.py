@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Models for the chats app: User, Conversation, Message, Notification, and MessageHistory.
+Models for the chats/messaging app: User, Conversation, Message, MessageHistory, and Notification.
 """
 
 import uuid
@@ -13,6 +13,8 @@ class User(AbstractUser):
     Custom User model extending Django's AbstractUser.
     Adds fields from the schema specification.
     """
+
+    # Override the default `id` with UUID
     user_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -20,15 +22,34 @@ class User(AbstractUser):
         unique=True,
         db_index=True
     )
-    email = models.EmailField(unique=True, null=False, blank=False)
-    phone_number = models.CharField(max_length=20, null=True, blank=True)
+
+    # Already exist in AbstractUser: first_name, last_name, password, email, username
+    # We override email to make it unique and required.
+    email = models.EmailField(
+        unique=True,
+        null=False,
+        blank=False
+    )
+
+    phone_number = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True
+    )
 
     ROLE_CHOICES = [
         ("guest", "Guest"),
         ("host", "Host"),
         ("admin", "Admin"),
     ]
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, null=False, blank=False)
+
+    role = models.CharField(
+        max_length=10,
+        choices=ROLE_CHOICES,
+        null=False,
+        blank=False
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     REQUIRED_FIELDS = ["email", "first_name", "last_name"]
@@ -38,6 +59,10 @@ class User(AbstractUser):
 
 
 class Conversation(models.Model):
+    """
+    Conversation model that tracks which users are involved in a conversation.
+    """
+
     conversation_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -45,7 +70,12 @@ class Conversation(models.Model):
         unique=True,
         db_index=True
     )
-    participants = models.ManyToManyField(User, related_name="conversations")
+
+    participants = models.ManyToManyField(
+        User,
+        related_name="conversations"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -53,6 +83,10 @@ class Conversation(models.Model):
 
 
 class Message(models.Model):
+    """
+    Message model containing the sender, receiver, conversation, and message body.
+    """
+
     message_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -60,17 +94,30 @@ class Message(models.Model):
         unique=True,
         db_index=True
     )
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="messages_sent")
-    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="messages_received")
-    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="messages")
+
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="messages_sent"
+    )
+
+    receiver = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="messages_received"
+    )
+
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name="messages"
+    )
 
     content = models.TextField(null=False, blank=False)
     timestamp = models.DateTimeField(auto_now_add=True)
 
-    # ✅ Track if the message was edited
+    # Edit tracking
     edited = models.BooleanField(default=False)
-
-    # ✅ Who edited the message last (can be None if never edited)
     edited_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -85,16 +132,14 @@ class Message(models.Model):
 
 class MessageHistory(models.Model):
     """
-    Stores previous versions of a message when it is edited.
+    Stores previous versions of messages when edited.
     """
-    history_id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        unique=True,
-        db_index=True
+
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name="history"
     )
-    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="history")
     old_content = models.TextField()
     edited_at = models.DateTimeField(auto_now_add=True)
     edited_by = models.ForeignKey(
@@ -106,24 +151,30 @@ class MessageHistory(models.Model):
     )
 
     def __str__(self):
-        return f"History of Message {self.message.message_id} at {self.edited_at}"
+        return f"History of {self.message.message_id} at {self.edited_at}"
 
 
 class Notification(models.Model):
     """
-    Stores notifications for users when they receive a new message.
+    Notification model to alert users when they receive new messages.
     """
-    notification_id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        unique=True,
-        db_index=True
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications"
     )
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
-    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="notifications")
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name="notifications"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Notification for {self.user.username} about Message {self.message.message_id}"
+        return f"Notification for {self.user.username} about {self.message.message_id}"
+
+
+class Meta:
+    app_label = "chats"
