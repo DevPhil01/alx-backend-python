@@ -1,0 +1,25 @@
+# Ignore Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Ignore environment files
+.env
+venv/
+env/
+*.sqlite3
+
+# Ignore system and Docker-related files
+.DS_Store
+.idea/
+.vscode/
+*.egg-info/
+
+# Ignore git and local files
+.git/
+.gitignore
+
+# Ignore system packages from Ubuntu
+*.deb
