@@ -1,24 +1,20 @@
-# Use an official Python 3.10 image as the base
-FROM python:3.10-slim
+# Use official Python base image
+FROM python:3.10
 
-# Set environment variables to prevent Python from writing .pyc files and buffering stdout/stderr
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Set working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# Copy the requirements file first (for dependency caching)
+# Copy requirements.txt and install dependencies
 COPY requirements.txt .
-
-# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire project into the container
+# Copy the rest of the application code
 COPY . .
 
 # Expose the port Django runs on
 EXPOSE 8000
 
-# Default command to run the Django development server
+# Note: When running the container, use -p to map ports (e.g., -p 8000:8000)
+# Run the Django application
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
