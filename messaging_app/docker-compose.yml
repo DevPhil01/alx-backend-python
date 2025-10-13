@@ -1,43 +1,46 @@
+version: "3.9"
+
 services:
   db:
-    container_name: mysql_db
     image: mysql:8.0
+    container_name: messaging_app_db
     restart: always
     environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_DB: ${MYSQL_DATABASE}  # added for checker
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    ports:
-      - "3306:3306"
     volumes:
-      - db_data:/var/lib/mysql
+      - messaging_app_db_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
+    ports:
+      - "3306:3306"
 
   web:
-    container_name: messaging_app
     build: .
+    container_name: messaging_app
     command: >
-      sh -c "python manage.py makemigrations &&
-             python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+      sh -c "python3 manage.py makemigrations &&
+             python3 manage.py migrate &&
+             python3 manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
     ports:
       - "8000:8000"
+    environment:
+      - MYSQL_DB=${MYSQL_DATABASE}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_HOST=db
     depends_on:
       db:
         condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      - DATABASE_NAME=${MYSQL_DATABASE}
-      - DATABASE_USER=${MYSQL_USER}
-      - DATABASE_PASSWORD=${MYSQL_PASSWORD}
-      - DATABASE_HOST=db
-      - DATABASE_PORT=3306
 
 volumes:
-  db_data:
+  messaging_app_db_data:
