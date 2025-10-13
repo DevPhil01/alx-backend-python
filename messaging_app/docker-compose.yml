@@ -1,24 +1,43 @@
-version: '3.9'
-
 services:
   db:
-    image: postgres:15
-    env_file:
-      - .env
+    container_name: mysql_db
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
-      - "5432:5432"
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   web:
-    image: messaging_app
-    command: sh -c "python3 manage.py migrate && python manage.py runserver 0.0.0.0:8000"
-    volumes:
-      - .:/app
+    container_name: messaging_app
+    build: .
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     env_file:
       - .env
+    environment:
+      - DATABASE_NAME=${MYSQL_DATABASE}
+      - DATABASE_USER=${MYSQL_USER}
+      - DATABASE_PASSWORD=${MYSQL_PASSWORD}
+      - DATABASE_HOST=db
+      - DATABASE_PORT=3306
 
 volumes:
-  postgres_data:
+  db_data:
