@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Ensure script exits if any command fails
+set -e
+
+DEPLOYMENT_NAME="messaging-app-deployment"
+NAMESPACE="default"
+
+echo "Scaling deployment $DEPLOYMENT_NAME to 3 replicas..."
+kubectl scale deployment $DEPLOYMENT_NAME --replicas=3 --namespace $NAMESPACE
+
+echo "Waiting for pods to be ready..."
+sleep 10  # Optional: give time for new pods to start
+
+echo "Verifying that multiple pods are running..."
+kubectl get pods --namespace $NAMESPACE
+
+# Optional: Basic load testing using wrk
+# Replace URL with your Django app service URL inside cluster or via port-forward
+APP_URL="http://localhost:8000"  
+echo "Performing basic load test on $APP_URL..."
+if command -v wrk &> /dev/null; then
+    wrk -t2 -c5 -d10s $APP_URL
+else
+    echo "wrk is not installed. Skipping load test."
+fi
+
+# Monitor resource usage
+echo "Monitoring resource usage of pods..."
+kubectl top pods --namespace $NAMESPACE
+
