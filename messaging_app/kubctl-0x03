@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Ensure script exits if any command fails
+set -e
+
+DEPLOYMENT_NAME="messaging-app-blue"
+SERVICE_URL="http://localhost:8000"  # Replace if using port-forward or actual service
+
+echo "Applying updated blue deployment..."
+kubectl apply -f blue_deployment.yaml
+
+echo "Monitoring rolling update progress..."
+kubectl rollout status deployment/$DEPLOYMENT_NAME
+
+echo "Testing app availability during update..."
+# Send requests every second for 10 seconds
+for i in {1..10}
+do
+    STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL)
+    echo "Request $i: HTTP status $STATUS_CODE"
+    sleep 1
+done
+
+echo "Current pods after rolling update:"
+kubectl get pods
+
+echo "Rolling update complete."
+
