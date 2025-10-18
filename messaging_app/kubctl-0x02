@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Ensure script exits if any command fails
+set -e
+
+echo "Deploying blue version..."
+kubectl apply -f blue_deployment.yaml
+
+echo "Deploying green version..."
+kubectl apply -f green_deployment.yaml
+
+echo "Deploying Service..."
+kubectl apply -f kubeservice.yaml
+
+echo "Waiting for pods to be ready..."
+sleep 10
+
+echo "Listing all pods..."
+kubectl get pods
+
+echo "Checking logs for blue deployment pods..."
+kubectl logs -l version=blue
+
+echo "Checking logs for green deployment pods..."
+kubectl logs -l version=green
+
+echo "Blue-green deployment applied successfully."
+
