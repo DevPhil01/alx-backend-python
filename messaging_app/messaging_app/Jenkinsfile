@@ -4,6 +4,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                echo "Checking out code from git branch main"
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
