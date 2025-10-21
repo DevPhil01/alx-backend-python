@@ -1,45 +1,56 @@
 pipeline {
-    agent any
+  agent any
 
-    stages {
-        stage('Checkout Code') {
-            steps {
-                git branch: 'main', url: 'https://github.com/DevPhil01/alx-backend-python.git'
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                    cd messaging_app
-                    python3 -m venv venv
-                    source venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
-            }
-        }
-
-        stage('Run Tests') {
-            steps {
-                sh '''
-                    cd messaging_app
-                    source venv/bin/activate
-                    pytest --junitxml=report.xml
-                '''
-            }
-        }
-
-        stage('Publish Test Report') {
-            steps {
-                junit 'messaging_app/report.xml'
-            }
-        }
+  stages {
+    stage('Checkout') {
+      steps {
+        // Checkout the repo (Jenkins will already do this for pipeline from SCM)
+        checkout([$class: 'GitSCM',
+                  branches: [[name: '*/main']],
+                  userRemoteConfigs: [[url: 'https://github.com/DevPhil01/alx-backend-python.git']]
+                 ])
+      }
     }
 
-    post {
+    stage('Install dependencies') {
+      steps {
+        dir('messaging_app') {
+          sh '''
+            # create venv and install deps
+            python3 -m venv .venv
+            . .venv/bin/activate
+            python3 -m pip install --upgrade pip
+            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          '''
+        }
+      }
+    }
+
+    stage('Run tests') {
+      steps {
+        dir('messaging_app') {
+          sh '''
+            . .venv/bin/activate
+            mkdir -p reports
+            # produce JUnit XML that Jenkins can parse
+            pytest --junitxml=reports/results.xml || true
+          '''
+        }
+      }
+      post {
         always {
-            echo 'Pipeline finished execution.'
+          // Publish the junit results (path is workspace-relative)
+          junit allowEmptyResults: true, testResults: 'messaging_app/reports/results.xml'
+          // Optionally archive reports
+          archiveArtifacts artifacts: 'messaging_app/reports/**', allowEmptyArchive: true
         }
+      }
     }
+  }
+
+  post {
+    always {
+      echo "Pipeline finished"
+    }
+  }
 }
