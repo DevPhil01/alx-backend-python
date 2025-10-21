@@ -1,56 +1,49 @@
 pipeline {
-  agent any
+    agent any
 
-  stages {
-    stage('Checkout') {
-      steps {
-        // Checkout the repo (Jenkins will already do this for pipeline from SCM)
-        checkout([$class: 'GitSCM',
-                  branches: [[name: '*/main']],
-                  userRemoteConfigs: [[url: 'https://github.com/DevPhil01/alx-backend-python.git']]
-                 ])
-      }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/DevPhil01/alx-backend-python.git',
+                        credentialsId: 'github-creds'
+                    ]]
+                ])
+            }
+        }
+
+        stage('Install dependencies') {
+            steps {
+                sh '''
+                    echo "Installing dependencies..."
+                    pip3 install --upgrade pip
+                    pip3 install -r messaging_app/requirements.txt
+                '''
+            }
+        }
+
+        stage('Run tests') {
+            steps {
+                sh '''
+                    echo "Running tests with pytest..."
+                    pytest --junitxml=messaging_app/reports/results.xml || true
+                '''
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'messaging_app/reports/results.xml'
+                    archiveArtifacts artifacts: 'messaging_app/reports/**', allowEmptyArchive: true
+                }
+            }
+        }
     }
 
-    stage('Install dependencies') {
-      steps {
-        dir('messaging_app') {
-          sh '''
-            # create venv and install deps
-            python3 -m venv .venv
-            . .venv/bin/activate
-            python3 -m pip install --upgrade pip
-            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          '''
-        }
-      }
-    }
-
-    stage('Run tests') {
-      steps {
-        dir('messaging_app') {
-          sh '''
-            . .venv/bin/activate
-            mkdir -p reports
-            # produce JUnit XML that Jenkins can parse
-            pytest --junitxml=reports/results.xml || true
-          '''
-        }
-      }
-      post {
+    post {
         always {
-          // Publish the junit results (path is workspace-relative)
-          junit allowEmptyResults: true, testResults: 'messaging_app/reports/results.xml'
-          // Optionally archive reports
-          archiveArtifacts artifacts: 'messaging_app/reports/**', allowEmptyArchive: true
+            echo "Pipeline completed successfully!"
         }
-      }
     }
-  }
-
-  post {
-    always {
-      echo "Pipeline finished"
-    }
-  }
 }
