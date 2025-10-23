@@ -1,9 +1,15 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_IMAGE = "phil96/messaging_app:latest"
+    }
+
     stages {
+
         stage('Checkout') {
             steps {
+                echo "Checking out source code from GitHub..."
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
@@ -19,6 +25,8 @@ pipeline {
             steps {
                 sh '''
                     echo "Setting up Python virtual environment..."
+                    apt-get update -y
+                    apt-get install -y python3-venv
                     python3 -m venv venv
                     . venv/bin/activate
                     python -m pip install --upgrade pip
@@ -32,6 +40,7 @@ pipeline {
                 sh '''
                     echo "Running tests with pytest..."
                     . venv/bin/activate
+                    mkdir -p messaging_app/reports
                     pytest --junitxml=messaging_app/reports/results.xml || true
                 '''
             }
@@ -47,24 +56,18 @@ pipeline {
             steps {
                 sh '''
                     echo "Building Docker image..."
-                    docker build -t phil96/messaging_app:latest messaging_app
+                    docker build -t $DOCKER_IMAGE messaging_app
                 '''
             }
         }
 
         stage('Push Docker image to Docker Hub') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'docker-creds',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
-                        echo "Pushing Docker image to Docker Hub..."
+                        echo "Logging in and pushing Docker image to Docker Hub..."
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push devphil01/messaging_app:latest
+                        docker push $DOCKER_IMAGE
                     '''
                 }
             }
