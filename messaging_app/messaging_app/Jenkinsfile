@@ -47,7 +47,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Building Docker image..."
-                    docker build -t devphil01/messaging_app:latest messaging_app
+                    docker build -t phil96/messaging_app:latest messaging_app
                 '''
             }
         }
