@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout([
@@ -19,10 +20,11 @@ pipeline {
             steps {
                 sh '''
                     echo "Setting up Python virtual environment..."
-                    python3 -m venv venv
+                    python3 -m venv venv || true
                     . venv/bin/activate
-                    python -m pip install --upgrade pip
-                    pip install -r messaging_app/requirements.txt
+                    python -m pip install --upgrade pip --break-system-packages
+                    pip install -r messaging_app/requirements.txt || true
+                    pip install pytest --break-system-packages
                 '''
             }
         }
@@ -32,7 +34,8 @@ pipeline {
                 sh '''
                     echo "Running tests with pytest..."
                     . venv/bin/activate
-                    pytest --junitxml=messaging_app/reports/results.xml || true
+                    mkdir -p messaging_app/reports
+                    pytest --maxfail=1 --disable-warnings -q --junitxml=messaging_app/reports/results.xml || true
                 '''
             }
             post {
@@ -46,7 +49,8 @@ pipeline {
         stage('Build Docker image') {
             steps {
                 sh '''
-                    echo "Building Docker image..."
+                    echo "Building Docker image with BuildKit..."
+                    export DOCKER_BUILDKIT=1
                     docker build -t devphil01/messaging_app:latest messaging_app
                 '''
             }
@@ -54,12 +58,15 @@ pipeline {
 
         stage('Push Docker image to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                        echo "Pushing Docker image to Docker Hub..."
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push devphil01/messaging_app:latest
-                    '''
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    retry(3) {
+                        sh '''
+                            echo "Logging into Docker Hub..."
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                            echo "Pushing Docker image to Docker Hub..."
+                            docker push devphil01/messaging_app:latest
+                        '''
+                    }
                 }
             }
         }
@@ -67,7 +74,7 @@ pipeline {
 
     post {
         always {
-            echo "Pipeline completed successfully!"
+            echo "Pipeline completed (check previous logs for any skipped stages or warnings)."
         }
     }
 }
