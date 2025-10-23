@@ -25,12 +25,20 @@ pipeline {
             steps {
                 sh '''
                     echo "Setting up Python virtual environment..."
-                    apt-get update -y
-                    apt-get install -y python3-venv
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    python -m pip install --upgrade pip
-                    pip install -r messaging_app/requirements.txt
+                    if [ "$(id -u)" -ne 0 ]; then
+                        echo "Running as non-root, using pip --break-system-packages..."
+                        python3 -m venv venv
+                        . venv/bin/activate
+                        python -m pip install --upgrade pip --break-system-packages
+                        pip install -r messaging_app/requirements.txt --break-system-packages
+                    else
+                        echo "Running as root, installing python3-venv first..."
+                        apt-get update -y && apt-get install -y python3-venv
+                        python3 -m venv venv
+                        . venv/bin/activate
+                        python -m pip install --upgrade pip
+                        pip install -r messaging_app/requirements.txt
+                    fi
                 '''
             }
         }
@@ -65,18 +73,4 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
-                        echo "Logging in and pushing Docker image to Docker Hub..."
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push $DOCKER_IMAGE
-                    '''
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            echo "Pipeline completed (check previous logs for any skipped stages or warnings)."
-        }
-    }
-}
+                        echo "Logging in and pushing Docker image to
