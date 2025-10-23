@@ -36,4 +36,44 @@ pipeline {
                 '''
             }
             post {
-                alw
+                always {
+                    junit allowEmptyResults: true, testResults: 'messaging_app/reports/results.xml'
+                    archiveArtifacts artifacts: 'messaging_app/reports/**', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Build Docker image') {
+            steps {
+                sh '''
+                    echo "Building Docker image..."
+                    docker build -t devphil01/messaging_app:latest messaging_app
+                '''
+            }
+        }
+
+        stage('Push Docker image to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'docker-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "Pushing Docker image to Docker Hub..."
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push devphil01/messaging_app:latest
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline completed (check previous logs for any skipped stages or warnings)."
+        }
+    }
+}
