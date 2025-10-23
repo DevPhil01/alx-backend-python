@@ -1,25 +1,15 @@
 pipeline {
     agent any
 
-    environment {
-        GITHUB_BRANCH = 'main'
-        GITHUB_REPO = 'https://github.com/DevPhil01/alx-backend-python.git'
-        GITHUB_CREDENTIALS = 'github-creds'
-        DOCKER_IMAGE = 'devphil01/messaging_app'  // Replace with your actual Docker Hub username/repo
-        DOCKER_CREDENTIALS = 'docker-creds'       // Jenkins credentials ID for Docker Hub
-    }
-
     stages {
-
         stage('Checkout') {
             steps {
-                echo "Checking out code from git branch ${GITHUB_BRANCH}"
                 checkout([
                     $class: 'GitSCM',
-                    branches: [[name: "*/${GITHUB_BRANCH}"]],
+                    branches: [[name: '*/main']],
                     userRemoteConfigs: [[
-                        url: "${GITHUB_REPO}",
-                        credentialsId: "${GITHUB_CREDENTIALS}"
+                        url: 'https://github.com/DevPhil01/alx-backend-python.git',
+                        credentialsId: 'github-creds'
                     ]]
                 ])
             }
@@ -28,9 +18,11 @@ pipeline {
         stage('Install dependencies') {
             steps {
                 sh '''
-                    echo "Installing dependencies..."
-                    pip3 install --upgrade pip
-                    pip3 install -r messaging_app/requirements.txt
+                    echo "Setting up Python virtual environment..."
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    python -m pip install --upgrade pip
+                    pip install -r messaging_app/requirements.txt
                 '''
             }
         }
@@ -39,6 +31,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Running tests with pytest..."
+                    . venv/bin/activate
                     pytest --junitxml=messaging_app/reports/results.xml || true
                 '''
             }
@@ -54,19 +47,18 @@ pipeline {
             steps {
                 sh '''
                     echo "Building Docker image..."
-                    docker build -t ${DOCKER_IMAGE}:latest messaging_app/
+                    docker build -t devphil01/messaging_app:latest messaging_app
                 '''
             }
         }
 
         stage('Push Docker image to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
-                        echo "Logging into Docker Hub..."
+                        echo "Pushing Docker image to Docker Hub..."
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        echo "Pushing image to Docker Hub..."
-                        docker push ${DOCKER_IMAGE}:latest
+                        docker push devphil01/messaging_app:latest
                     '''
                 }
             }
